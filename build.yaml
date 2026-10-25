@@ -1,0 +1,11 @@
+targets:
+  $default:
+    builders:
+      riverpod_generator:
+        generate_for:
+          - lib/services/scramble_generator.dart
+          - lib/services/statistics_repository.dart
+          - lib/services/solve_repository.dart
+          - lib/services/coach_repository.dart
+          - lib/services/persistent_scramble_repository.dart
+          - lib/services/training_repository.dart

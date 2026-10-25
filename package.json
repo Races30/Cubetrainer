@@ -1,0 +1,24 @@
+{
+  "name": "cubetrainer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CubeTrainer - Speedcubing Timer, Stats & AI Coach (Capacitor iOS Wrapper)",
+  "scripts": {
+    "dev": "flutter run -d chrome",
+    "build": "flutter build web --release --base-href / --pwa-strategy=none",
+    "build:web": "flutter build web --release --base-href / --pwa-strategy=none",
+    "cap:sync": "npx cap sync ios",
+    "cap:copy": "npx cap copy ios",
+    "ios:prepare": "npm run build:web && npm run cap:sync",
+    "lint": "flutter analyze lib/",
+    "test": "flutter test",
+    "typecheck": "dart analyze lib/"
+  },
+  "dependencies": {
+    "@capacitor/core": "^7.6.9",
+    "@capacitor/ios": "^7.6.9"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.6.9"
+  }
+}

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="#0F172A">
+
+    <TextView
+        android:id="@+id/cube_type_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="3x3"
+        android:textColor="#38BDF8"
+        android:textStyle="bold"
+        android:textSize="12sp" />
+
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="8dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="BEST"
+        android:textColor="#94A3B8"
+        android:textSize="10sp" />
+
+    <TextView
+        android:id="@+id/best_time_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="--"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:textSize="20sp" />
+
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="4dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Ao5"
+        android:textColor="#94A3B8"
+        android:textSize="10sp" />
+
+    <TextView
+        android:id="@+id/ao5_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="--"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:textSize="16sp" />
+
+</LinearLayout>

@@ -1,0 +1,246 @@
+name: Build iOS Unsigned IPA
+
+on:
+  push:
+    branches:
+      - ios
+      - 'ios/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-ios:
+    name: Build Unsigned IPA (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 2. Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: 3. Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: 4. Prepare Environment File (assets/.env)
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          mkdir -p assets
+          if [ -n "$DEEPSEEK_API_KEY" ]; then
+            echo "DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY" > assets/.env
+            echo "Configured assets/.env from GitHub Secrets."
+          else
+            echo "DEEPSEEK_API_KEY=" > assets/.env
+            echo "Created empty fallback assets/.env (no secret configured)."
+          fi
+
+      - name: 5. Install Dependencies (Flutter & Node/Capacitor)
+        run: |
+          flutter pub get
+          npm ci
+
+      - name: 6. Run Quality Checks (Lint & Tests)
+        run: |
+          npm run lint
+          npm test
+
+      - name: 7. Build Production Web App
+        run: |
+          npm run build:web
+          test -f build/web/index.html
+          test -f build/web/main.dart.js
+
+      - name: 8. Generate Build Identification Metadata
+        id: meta
+        run: |
+          COMMIT_SHA="${GITHUB_SHA}"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          BRANCH_NAME="${GITHUB_REF_NAME}"
+          APP_VERSION=$(node -p "require('./package.json').version")
+          BUILD_NUMBER="${GITHUB_RUN_NUMBER}"
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          {
+            echo "commit_sha=${COMMIT_SHA}"
+            echo "short_sha=${SHORT_SHA}"
+            echo "branch=${BRANCH_NAME}"
+            echo "app_version=${APP_VERSION}"
+            echo "build_number=${BUILD_NUMBER}"
+            echo "build_date=${BUILD_DATE}"
+          } >> "$GITHUB_OUTPUT"
+
+          cat <<EOF > build/web/build-info.json
+          {
+            "appName": "CubeTrainer",
+            "appId": "com.races30.cubetrainer",
+            "version": "${APP_VERSION}",
+            "buildNumber": "${BUILD_NUMBER}",
+            "commitSha": "${COMMIT_SHA}",
+            "shortSha": "${SHORT_SHA}",
+            "branch": "${BRANCH_NAME}",
+            "buildDateUtc": "${BUILD_DATE}"
+          }
+          EOF
+
+          cat <<EOF > BUILD_INFO.txt
+          ==================================================
+          CUBETRAINER iOS BUILD INFORMATION
+          ==================================================
+          App Name:      CubeTrainer
+          Bundle ID:     com.races30.cubetrainer
+          App Version:   ${APP_VERSION}
+          Build Number:  ${BUILD_NUMBER}
+          Git Branch:    ${BRANCH_NAME}
+          Git Commit:    ${COMMIT_SHA}
+          Short SHA:     ${SHORT_SHA}
+          Build Date:    ${BUILD_DATE}
+          IPA File:      CubeTrainer-unsigned.ipa
+          ==================================================
+          EOF
+
+          cat BUILD_INFO.txt
+
+      - name: 9. Sync Capacitor iOS & Install CocoaPods
+        run: |
+          npx cap sync ios
+          if [ ! -d "ios/App/Pods" ]; then
+            echo "Running pod install in ios/App..."
+            (cd ios/App && pod install)
+          fi
+          test -f ios/App/App/public/index.html
+          test -f ios/App/App/public/build-info.json
+
+      - name: 10. Inject Version & Commit Metadata into iOS Info.plist
+        run: |
+          PLIST="ios/App/App/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.meta.outputs.app_version }}" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ steps.meta.outputs.build_number }}" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Delete :GitCommitSHA" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :GitCommitSHA string ${{ steps.meta.outputs.commit_sha }}" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Delete :GitCommitShortSHA" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :GitCommitShortSHA string ${{ steps.meta.outputs.short_sha }}" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Delete :GitBranch" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :GitBranch string ${{ steps.meta.outputs.branch }}" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Delete :BuildDateUTC" "$PLIST" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :BuildDateUTC string ${{ steps.meta.outputs.build_date }}" "$PLIST"
+
+      - name: 11. Build Unsigned iOS App Bundle (xcodebuild)
+        run: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/ios_derived \
+            MARKETING_VERSION="${{ steps.meta.outputs.app_version }}" \
+            CURRENT_PROJECT_VERSION="${{ steps.meta.outputs.build_number }}" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            EXPANDED_CODE_SIGN_IDENTITY="" \
+            clean build
+
+      - name: 12. Create & Verify Unsigned IPA (CubeTrainer-unsigned.ipa)
+        run: |
+          APP_BUNDLE="build/ios_derived/Build/Products/Release-iphoneos/App.app"
+          if [ ! -d "$APP_BUNDLE" ]; then
+            echo "ERROR: App.app bundle not found at $APP_BUNDLE"
+            exit 1
+          fi
+
+          cp BUILD_INFO.txt "$APP_BUNDLE/BUILD_INFO.txt"
+
+          rm -rf Payload CubeTrainer-unsigned.ipa
+          mkdir -p Payload
+          cp -R "$APP_BUNDLE" Payload/App.app
+          zip -qry CubeTrainer-unsigned.ipa Payload
+
+          if [ ! -s "CubeTrainer-unsigned.ipa" ]; then
+            echo "ERROR: CubeTrainer-unsigned.ipa was not created or is empty!"
+            exit 1
+          fi
+
+          IPA_SIZE=$(du -h CubeTrainer-unsigned.ipa | cut -f1)
+          echo "Successfully created CubeTrainer-unsigned.ipa (${IPA_SIZE})"
+
+          cat <<EOF >> "$GITHUB_STEP_SUMMARY"
+          ## CubeTrainer iOS Unsigned Build Summary
+          | Property | Value |
+          | :--- | :--- |
+          | **IPA File** | \`CubeTrainer-unsigned.ipa\` (${IPA_SIZE}) |
+          | **App Version** | \`${{ steps.meta.outputs.app_version }}\` |
+          | **Build Number** | \`#${{ steps.meta.outputs.build_number }}\` |
+          | **Git Branch** | \`${{ steps.meta.outputs.branch }}\` |
+          | **Git Commit SHA** | \`${{ steps.meta.outputs.commit_sha }}\` (\`${{ steps.meta.outputs.short_sha }}\`) |
+          | **Build Date (UTC)** | \`${{ steps.meta.outputs.build_date }}\` |
+          EOF
+
+      - name: 13. Upload IPA as GitHub Actions Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CubeTrainer-unsigned-ipa
+          path: |
+            CubeTrainer-unsigned.ipa
+            BUILD_INFO.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 14. Publish / Update GitHub Release (latest-ios)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+          RECENT_COMMITS=$(git log -n 5 --pretty=format:"- \`%h\` %s (%an)")
+
+          cat <<EOF > RELEASE_NOTES.md
+          ## CubeTrainer iOS — Unsigned IPA (\`latest-ios\`)
+
+          Questa release contiene l'ultima build iOS non firmata (**unsigned IPA**) generata automaticamente da GitHub Actions su macOS.
+
+          ### Identificazione Build
+          - **File IPA:** \`CubeTrainer-unsigned.ipa\`
+          - **Versione App:** \`${{ steps.meta.outputs.app_version }}\`
+          - **Build Number:** \`#${{ steps.meta.outputs.build_number }}\`
+          - **Branch:** \`${{ steps.meta.outputs.branch }}\`
+          - **Commit SHA:** \`${{ steps.meta.outputs.commit_sha }}\` (\`${{ steps.meta.outputs.short_sha }}\`)
+          - **Ultimo Commit:** ${COMMIT_MSG}
+          - **Data Build (UTC):** \`${{ steps.meta.outputs.build_date }}\`
+
+          ### Changelog Recente
+          ${RECENT_COMMITS}
+          EOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -fa latest-ios "${{ steps.meta.outputs.commit_sha }}" -m "Latest iOS build #${{ steps.meta.outputs.build_number }} (${{ steps.meta.outputs.short_sha }})"
+          git push origin refs/tags/latest-ios --force
+
+          if gh release view latest-ios >/dev/null 2>&1; then
+            echo "Updating existing release latest-ios..."
+            gh release edit latest-ios \
+              --title "CubeTrainer iOS Unsigned — v${{ steps.meta.outputs.app_version }} #${{ steps.meta.outputs.build_number }} (${{ steps.meta.outputs.short_sha }})" \
+              --notes-file RELEASE_NOTES.md \
+              --prerelease
+            gh release upload latest-ios CubeTrainer-unsigned.ipa BUILD_INFO.txt --clobber
+          else
+            echo "Creating new release latest-ios..."
+            gh release create latest-ios CubeTrainer-unsigned.ipa BUILD_INFO.txt \
+              --target "${{ steps.meta.outputs.commit_sha }}" \
+              --title "CubeTrainer iOS Unsigned — v${{ steps.meta.outputs.app_version }} #${{ steps.meta.outputs.build_number }} (${{ steps.meta.outputs.short_sha }})" \
+              --notes-file RELEASE_NOTES.md \
+              --prerelease
+          fi

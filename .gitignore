@@ -1,0 +1,82 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ / VS Code related
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+/android/build/
+/android/.gradle/
+
+# Environment secrets (never commit real API keys)
+assets/.env
+.env
+
+# Node / Capacitor
+node_modules/
+ios/App/Pods/
+ios/App/build/
+*.ipa
+Payload/
+BUILD_INFO.txt
+
+# Temporary local analysis and test logs
+analysis.json
+analysis_*.txt
+analyze*.txt
+build_log.txt
+dart_analysis.txt
+final_analyze*.txt
+last_test*.txt
+t3*.txt
+test_*_out*.txt
+test_final_check*.txt
+test_image_out.txt
+test_image2_out*.txt
+test_orientation_out.txt
+test_oriented_out.txt
+test_output.txt
+test_results*.txt
+test_solved_out*.txt
+test_translate_out.txt
+test_user_solution_out*.txt
+test_wca_out.txt
