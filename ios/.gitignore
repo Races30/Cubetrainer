@@ -11,3 +11,7 @@ capacitor-cordova-ios-plugins
 # Generated Config files
 App/App/capacitor.config.json
 App/App/config.xml
+
+# Ephemeral Flutter iOS plugin registrants (not used by Capacitor Xcode workspace)
+Flutter/
+Runner/

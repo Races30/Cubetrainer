@@ -42,10 +42,10 @@
 - Controllare `git status` e `git diff` (nessun segreto, `main` intatto), eseguire commit e push del branch `ios`.
 - Monitorare l'esecuzione reale su GitHub Actions fino al completamento con successo (`Completed` / `Success`).
 - Verificare che l'IPA sia stata creata, caricata negli artifact e pubblicata nella GitHub Release `latest-ios` con il commit SHA corrispondente.
-- **Stato:** [ ] Da eseguire
+- **Stato:** [x] Completato
 
 ## Task 8: Fasi 11 & 12 — Documentazione `IOS_BUILD.md` e Controllo Finale Qualità e Sicurezza
 - Creare la documentazione completa `IOS_BUILD.md` (punti A–L + sezione `"QUICK RELEASE"`).
 - Eseguire tutti i controlli finali di qualità e sicurezza (`npm test`, `npm run lint`, `npm run build:web`, `npx cap sync ios`, verifica zero segreti/certificati nel repo).
 - Eseguire commit e push finale sul branch `ios` e verificare che l'ultima run GitHub Actions sia verde e allineata.
-- **Stato:** [ ] Da eseguire
+- **Stato:** [x] Completato
