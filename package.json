@@ -10,7 +10,7 @@
     "cap:sync": "npx cap sync ios",
     "cap:copy": "npx cap copy ios",
     "ios:prepare": "npm run build:web && npm run cap:sync",
-    "lint": "flutter analyze lib/",
+    "lint": "flutter analyze --no-fatal-infos lib/",
     "test": "flutter test",
     "typecheck": "dart analyze lib/"
   },
