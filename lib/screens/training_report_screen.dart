@@ -48,7 +48,7 @@ class _TrainingReportScreenState extends ConsumerState<TrainingReportScreen> {
       type: widget.type,
       date: DateTime.now(),
       totalSolves: widget.solves.length,
-      successPercentage: 100.0, // Simplification
+      successPercentage: 100.0,
       metadata: {'average': avg.toStringAsFixed(2)},
     );
 
@@ -63,15 +63,19 @@ class _TrainingReportScreenState extends ConsumerState<TrainingReportScreen> {
             "Analizza questa sessione di allenamento di tipo ${widget.type.name} (sul puzzle: ${widget.cubeType.label}) e dai consigli pratici.",
             summary,
           );
-      setState(() {
-        _coachAdvice = advice;
-        _isLoadingAdvice = false;
-      });
+      if (mounted) {
+        setState(() {
+          _coachAdvice = advice;
+          _isLoadingAdvice = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _coachAdvice = "Errore nel recupero dei consigli: $e";
-        _isLoadingAdvice = false;
-      });
+      if (mounted) {
+        setState(() {
+          _coachAdvice = "Errore nel recupero dei consigli: $e";
+          _isLoadingAdvice = false;
+        });
+      }
     }
   }
 
@@ -82,7 +86,6 @@ class _TrainingReportScreenState extends ConsumerState<TrainingReportScreen> {
     final avg = times.reduce((a, b) => a + b) / times.length;
     final best = times.reduce((a, b) => a < b ? a : b);
 
-    // Phase breakdown
     Map<String, double> phaseAvgs = {};
     if (widget.solves.isNotEmpty && widget.solves.first.phaseTimes.isNotEmpty) {
       for (var label in widget.solves.first.phaseTimes.keys) {
@@ -118,18 +121,22 @@ class _TrainingReportScreenState extends ConsumerState<TrainingReportScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildStatCard(theme, summary),
-            const SizedBox(height: 20),
-            _buildPhaseChart(
-                theme, summary['phaseBreakdown'] as Map<String, double>?),
-            const SizedBox(height: 20),
-            _buildCoachCard(theme),
-            const SizedBox(height: 100),
-          ],
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              _buildStatCard(theme, summary),
+              const SizedBox(height: 20),
+              _buildPhaseChart(
+                  theme, summary['phaseBreakdown'] as Map<String, double>?),
+              const SizedBox(height: 20),
+              _buildCoachCard(theme),
+              const SizedBox(height: 40),
+            ],
+          ),
         ),
       ),
     );
@@ -161,7 +168,11 @@ class _TrainingReportScreenState extends ConsumerState<TrainingReportScreen> {
         Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
         const SizedBox(height: 4),
         Text(value,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              fontFeatures: [FontFeature.tabularFigures()],
+            )),
       ],
     );
   }
@@ -197,7 +208,7 @@ class _TrainingReportScreenState extends ConsumerState<TrainingReportScreen> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
-                    value: e.value / 30000, // Normalized to 30s
+                    value: e.value / 30000,
                     minHeight: 8,
                     backgroundColor: theme.colorScheme.surfaceContainerHighest,
                   ),

@@ -7,6 +7,7 @@ import 'training_timer_screen.dart';
 import 'leaderboard_screen.dart';
 import 'oll_pll_selection_screen.dart';
 import '../services/oll_pll_classifier.dart';
+import '../utils/ios_platform_helper.dart';
 
 class ScrambleTrainingTab extends ConsumerStatefulWidget {
   const ScrambleTrainingTab({super.key});
@@ -22,8 +23,6 @@ class _ScrambleTrainingTabState extends ConsumerState<ScrambleTrainingTab> {
   bool _useInspection = true;
   bool _manualInspection = true;
   final double _targetTime = 30.0; // Default target
-
-  // Removed repeats and evaluation mode from UI setup as they are fluid now
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +52,7 @@ class _ScrambleTrainingTabState extends ConsumerState<ScrambleTrainingTab> {
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -73,12 +72,12 @@ class _ScrambleTrainingTabState extends ConsumerState<ScrambleTrainingTab> {
                 icon: const Icon(Icons.leaderboard, size: 18),
                 label: const Text('Classifica'),
                 style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
+                  minimumSize: const Size(44, 40),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           _buildCard(
             theme,
             child: Column(
@@ -89,7 +88,14 @@ class _ScrambleTrainingTabState extends ConsumerState<ScrambleTrainingTab> {
                     DropdownButton<ExerciseType>(
                       value: _selectedType,
                       underline: const SizedBox(),
-                      onChanged: (val) => setState(() => _selectedType = val!),
+                      dropdownColor: const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(14),
+                      onChanged: (val) {
+                        if (val != null) {
+                          IosPlatformHelper.selectionClick();
+                          setState(() => _selectedType = val);
+                        }
+                      },
                       items: availableExercises
                           .map((e) => DropdownMenuItem(
                                 value: e,
@@ -102,7 +108,10 @@ class _ScrambleTrainingTabState extends ConsumerState<ScrambleTrainingTab> {
                 SwitchListTile(
                   title: const Text('Ispezione (15s)'),
                   value: _useInspection,
-                  onChanged: (val) => setState(() => _useInspection = val),
+                  onChanged: (val) {
+                    IosPlatformHelper.selectionClick();
+                    setState(() => _useInspection = val);
+                  },
                   contentPadding: EdgeInsets.zero,
                 ),
                 if (_useInspection)
@@ -110,16 +119,19 @@ class _ScrambleTrainingTabState extends ConsumerState<ScrambleTrainingTab> {
                     title: const Text('Avvio Manuale Ispezione'),
                     subtitle: const Text('Richiede tocco per iniziare i 15s'),
                     value: _manualInspection,
-                    onChanged: (val) => setState(() => _manualInspection = val),
+                    onChanged: (val) {
+                      IosPlatformHelper.selectionClick();
+                      setState(() => _manualInspection = val);
+                    },
                     contentPadding: EdgeInsets.zero,
                   ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
-            height: 56,
+            height: 54,
             child: FilledButton.icon(
               onPressed: _startSession,
               icon: const Icon(Icons.play_arrow_rounded),
@@ -131,7 +143,7 @@ class _ScrambleTrainingTabState extends ConsumerState<ScrambleTrainingTab> {
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           _buildInfoBox(theme),
           const SizedBox(height: 24),
           _buildOllPllSection(theme, activeCubeType),
@@ -142,11 +154,15 @@ class _ScrambleTrainingTabState extends ConsumerState<ScrambleTrainingTab> {
 
   Widget _buildInfoRow(ThemeData theme, String label, Widget child) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+          Flexible(
+            child: Text(label,
+                style: const TextStyle(fontWeight: FontWeight.w500)),
+          ),
+          const SizedBox(width: 8),
           child,
         ],
       ),
@@ -154,6 +170,7 @@ class _ScrambleTrainingTabState extends ConsumerState<ScrambleTrainingTab> {
   }
 
   void _openLeaderboard() {
+    IosPlatformHelper.lightImpact();
     Navigator.of(context).push(
       MaterialPageRoute(builder: (context) => const LeaderboardScreen()),
     );
@@ -237,11 +254,12 @@ class _ScrambleTrainingTabState extends ConsumerState<ScrambleTrainingTab> {
   }
 
   void _startSession() {
+    IosPlatformHelper.mediumImpact();
     final activeCubeType = ref.read(selectedCubeTypeProvider);
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => TrainingTimerScreen(
-          initialType: _selectedType, // Changed param name
+          initialType: _selectedType,
           useInspection: _useInspection,
           manualInspection: _manualInspection,
           targetTime: _targetTime,
@@ -263,16 +281,18 @@ class _ScrambleTrainingTabState extends ConsumerState<ScrambleTrainingTab> {
             letterSpacing: 1.2,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         _buildCard(
           theme,
           child: ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(Icons.grid_on, color: theme.colorScheme.primary),
-            title: Text('Allenamento ${OllPllClassifier.getLabelForPuzzle(activeCube)}'),
+            title: Text(
+                'Allenamento ${OllPllClassifier.getLabelForPuzzle(activeCube)}'),
             subtitle: const Text('Spaced repetition per algoritmi completi'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
+              IosPlatformHelper.lightImpact();
               Navigator.of(context).push(
                 MaterialPageRoute(
                     builder: (context) => const OllPllSelectionScreen()),

@@ -1,38 +1,202 @@
 <!DOCTYPE html>
-<html>
+<html lang="it">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="CubeTrainer - Speedcubing Timer, Stats & AI Coach">
+  <meta name="theme-color" content="#0F172A">
+  <meta name="format-detection" content="telephone=no">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="cubetrainer">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CubeTrainer">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>cubetrainer</title>
+  <title>CubeTrainer</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    :root {
+      --sat: env(safe-area-inset-top, 0px);
+      --sar: env(safe-area-inset-right, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+      --sal: env(safe-area-inset-left, 0px);
+      color-scheme: dark;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #0F172A;
+      color: #F8FAFC;
+      overflow: hidden;
+      position: fixed;
+      inset: 0;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior: none;
+      touch-action: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Prevent iOS WebKit auto-zoom on text input focus (must be >= 16px) */
+    flt-text-editing-host input,
+    flt-text-editing-host textarea,
+    input,
+    textarea {
+      font-size: 16px !important;
+      -webkit-user-select: text !important;
+      user-select: text !important;
+      caret-color: #38BDF8;
+    }
+
+    #safe-area-probe {
+      position: fixed;
+      top: env(safe-area-inset-top, 0px);
+      right: env(safe-area-inset-right, 0px);
+      bottom: env(safe-area-inset-bottom, 0px);
+      left: env(safe-area-inset-left, 0px);
+      pointer-events: none;
+      visibility: hidden;
+      z-index: -1;
+    }
+  </style>
+
+  <script>
+    (function() {
+      function enforceViewportFitCover() {
+        var metas = document.head.querySelectorAll('meta[name="viewport"]');
+        for (var i = 0; i < metas.length; i++) {
+          var content = metas[i].getAttribute('content') || '';
+          if (content.indexOf('viewport-fit=cover') === -1) {
+            metas[i].setAttribute(
+              'content',
+              content + (content ? ', ' : '') + 'viewport-fit=cover'
+            );
+          }
+        }
+      }
+
+      enforceViewportFitCover();
+
+      var observer = new MutationObserver(function() {
+        enforceViewportFitCover();
+      });
+      observer.observe(document.head, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['content']
+      });
+
+      function parsePx(val) {
+        var n = parseFloat(val);
+        return isNaN(n) ? 0 : n;
+      }
+
+      function isIosDevice() {
+        var ua = navigator.userAgent || '';
+        var platform = navigator.platform || '';
+        return /iPhone|iPod|iPad/i.test(ua) ||
+          (platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+          !!(window.webkit && window.webkit.messageHandlers);
+      }
+
+      window.getCubeTrainerSafeAreaInsets = function() {
+        // 1. Native iOS bridge insets injected from AppDelegate.swift
+        if (window.__nativeSafeAreaInsets) {
+          var nat = window.__nativeSafeAreaInsets;
+          if (nat.top > 0 || nat.bottom > 0 || nat.left > 0 || nat.right > 0) {
+            return {
+              top: Number(nat.top) || 0,
+              bottom: Number(nat.bottom) || 0,
+              left: Number(nat.left) || 0,
+              right: Number(nat.right) || 0
+            };
+          }
+        }
+
+        // 2. CSS env(safe-area-inset-*) probe
+        var probe = document.getElementById('safe-area-probe');
+        if (probe) {
+          var cs = window.getComputedStyle(probe);
+          var top = parsePx(cs.top);
+          var right = parsePx(cs.right);
+          var bottom = parsePx(cs.bottom);
+          var left = parsePx(cs.left);
+          if (top > 0 || bottom > 0 || left > 0 || right > 0) {
+            return { top: top, bottom: bottom, left: left, right: right };
+          }
+        }
+
+        // 3. Fallback for iPhone standalone / WKWebView before CSS env resolves
+        if (isIosDevice()) {
+          var w = window.innerWidth || screen.width || 390;
+          var h = window.innerHeight || screen.height || 844;
+          var isPortrait = h >= w;
+          var maxDim = Math.max(w, h);
+          var hasHomeIndicator = maxDim >= 812;
+          if (isPortrait) {
+            var topInset = maxDim >= 852 ? 59 : (hasHomeIndicator ? 47 : 20);
+            var bottomInset = hasHomeIndicator ? 34 : 0;
+            return { top: topInset, bottom: bottomInset, left: 0, right: 0 };
+          } else {
+            var sideInset = hasHomeIndicator ? 47 : 0;
+            var bottomLandscape = hasHomeIndicator ? 21 : 0;
+            return { top: 0, bottom: bottomLandscape, left: sideInset, right: sideInset };
+          }
+        }
+
+        return { top: 0, bottom: 0, left: 0, right: 0 };
+      };
+
+      window.triggerIosHaptic = function(style) {
+        try {
+          if (window.webkit &&
+              window.webkit.messageHandlers &&
+              window.webkit.messageHandlers.iosHaptics) {
+            window.webkit.messageHandlers.iosHaptics.postMessage(style || 'light');
+            return;
+          }
+          if (navigator.vibrate) {
+            navigator.vibrate(style === 'heavy' ? 25 : (style === 'medium' ? 15 : 8));
+          }
+        } catch (_) {}
+      };
+
+      // Prevent iOS Safari/WKWebView pinch-to-zoom and long-press context menu
+      document.addEventListener('gesturestart', function(e) {
+        e.preventDefault();
+      }, { passive: false });
+      document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+      }, { passive: false });
+
+      window.addEventListener('resize', function() {
+        window.dispatchEvent(new CustomEvent('ios-safe-area-change'));
+      });
+      window.addEventListener('orientationchange', function() {
+        setTimeout(function() {
+          window.dispatchEvent(new CustomEvent('ios-safe-area-change'));
+        }, 100);
+      });
+    })();
+  </script>
 </head>
 <body>
+  <div id="safe-area-probe" aria-hidden="true"></div>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

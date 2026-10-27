@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../providers/oll_pll_provider.dart';
 import '../services/oll_pll_repository.dart';
 import '../models/oll_pll_case.dart';
@@ -7,6 +8,7 @@ import '../models/oll_pll_solve.dart';
 import '../widgets/puzzle_grid_preview.dart';
 import '../widgets/training_timer.dart';
 import '../utils/formatters.dart';
+import '../utils/ios_platform_helper.dart';
 
 class OllPllTimerScreen extends ConsumerStatefulWidget {
   const OllPllTimerScreen({super.key});
@@ -19,9 +21,23 @@ class _OllPllTimerScreenState extends ConsumerState<OllPllTimerScreen> {
   TimerState _timerState = TimerState.idleInspection;
 
   @override
+  void initState() {
+    super.initState();
+    WakelockPlus.enable();
+  }
+
+  @override
+  void dispose() {
+    WakelockPlus.disable();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final currentCase = ref.watch(currentOllPllCaseProvider);
     final theme = Theme.of(context);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isCompact = screenHeight < 720;
 
     if (currentCase == null) {
       return const Scaffold(
@@ -54,6 +70,7 @@ class _OllPllTimerScreenState extends ConsumerState<OllPllTimerScreen> {
                   IconButton(
                     icon: const Icon(Icons.skip_next),
                     onPressed: () {
+                      IosPlatformHelper.selectionClick();
                       ref
                           .read(currentOllPllCaseProvider.notifier)
                           .nextRandomCase();
@@ -62,12 +79,18 @@ class _OllPllTimerScreenState extends ConsumerState<OllPllTimerScreen> {
               ],
             ),
       body: SafeArea(
+        top: isTimerActive,
+        bottom: true,
         child: Column(
           children: [
             // Always visible Header with Case Name and Algorithm
             Padding(
-              padding:
-                  EdgeInsets.only(top: isTimerActive ? 24.0 : 8.0, bottom: 8.0),
+              padding: EdgeInsets.fromLTRB(
+                16.0,
+                isTimerActive ? 16.0 : 8.0,
+                16.0,
+                8.0,
+              ),
               child: Column(
                 children: [
                   if (isTimerActive)
@@ -82,9 +105,9 @@ class _OllPllTimerScreenState extends ConsumerState<OllPllTimerScreen> {
                   Text(
                     currentCase.algorithm,
                     style: TextStyle(
-                      fontSize: 24,
+                      fontSize: isCompact ? 19 : 22,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 2.0,
+                      letterSpacing: 1.4,
                       color: theme.colorScheme.primary,
                     ),
                     textAlign: TextAlign.center,
@@ -94,7 +117,8 @@ class _OllPllTimerScreenState extends ConsumerState<OllPllTimerScreen> {
             ),
             if (!isTimerActive)
               Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
@@ -107,7 +131,10 @@ class _OllPllTimerScreenState extends ConsumerState<OllPllTimerScreen> {
               Expanded(
                 flex: 2,
                 child: Center(
-                  child: PuzzleGridPreview(ollPllCase: currentCase, size: 160),
+                  child: PuzzleGridPreview(
+                    ollPllCase: currentCase,
+                    size: isCompact ? 128 : 152,
+                  ),
                 ),
               ),
             Expanded(
@@ -115,7 +142,7 @@ class _OllPllTimerScreenState extends ConsumerState<OllPllTimerScreen> {
               child: Padding(
                 padding: EdgeInsets.symmetric(
                   horizontal: 16.0,
-                  vertical: isTimerActive ? 64.0 : 16.0,
+                  vertical: isTimerActive ? 24.0 : 12.0,
                 ),
                 child: Container(
                   width: double.infinity,
@@ -133,15 +160,12 @@ class _OllPllTimerScreenState extends ConsumerState<OllPllTimerScreen> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(32),
                     child: TrainingTimer(
-                      useInspection:
-                          false, // OLL/PLL training usually skips 15s inspection for rapid fire
+                      useInspection: false,
                       manualInspection: false,
                       onStateChanged: (state) {
                         setState(() => _timerState = state);
                       },
-                      onStart: () {
-                        // Timer started
-                      },
+                      onStart: () {},
                       onStop: (timeMs) {
                         _saveSolveAndAdvance(currentCase, timeMs);
                       },
@@ -167,7 +191,6 @@ class _OllPllTimerScreenState extends ConsumerState<OllPllTimerScreen> {
     await repo.saveSolve(solve);
     ref.read(statsRefreshTriggerProvider.notifier).state++;
 
-    // Add a tiny delay to let the user see their time
     await Future.delayed(const Duration(milliseconds: 1000));
 
     if (mounted) {
@@ -194,7 +217,11 @@ class _StatBox extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           value != null ? Formatters.formatTime(value!) : '--',
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
         ),
       ],
     );

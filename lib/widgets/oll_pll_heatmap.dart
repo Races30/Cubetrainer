@@ -6,6 +6,7 @@ import '../models/oll_pll_case.dart';
 import '../services/oll_pll_data.dart';
 import '../providers/oll_pll_provider.dart';
 import '../services/oll_pll_classifier.dart';
+import '../utils/ios_platform_helper.dart';
 import 'puzzle_grid_preview.dart';
 
 class OllPllHeatmap extends ConsumerStatefulWidget {
@@ -21,15 +22,12 @@ class _OllPllHeatmapState extends ConsumerState<OllPllHeatmap> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = screenWidth < 390 ? 5 : 6;
     final activeCube = ref.watch(selectedCubeTypeProvider);
 
     List<OllPllCase> cases = allCasesByPuzzle[activeCube] ?? [];
 
-    // Add 3x3 cases if the cube is a bigger NxN cube and the filter isn't strict parity.
-    // Wait, per user instruction: 4x4-7x7 only show Parity. They don't show 3x3 cases here!
-    // So we just use allCasesByPuzzle[activeCube].
-
-    // Apply local filter based on the dynamic tabs
     if (_currentFilter != 'Tutti') {
       cases = cases.where((c) => c.category == _currentFilter).toList();
     }
@@ -50,7 +48,7 @@ class _OllPllHeatmapState extends ConsumerState<OllPllHeatmap> {
     }
 
     Color getColorForTime(int? timeMs) {
-      if (timeMs == null) return Colors.grey.withOpacity(0.3);
+      if (timeMs == null) return Colors.grey.withValues(alpha: 0.3);
       if (maxMs == minMs) return Colors.greenAccent;
       final ratio = ((timeMs - minMs) / (maxMs - minMs)).clamp(0.0, 1.0);
       return Color.lerp(Colors.greenAccent, Colors.redAccent, ratio)!;
@@ -76,21 +74,22 @@ class _OllPllHeatmapState extends ConsumerState<OllPllHeatmap> {
         _buildDynamicFilterTabs(theme, activeCube),
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.symmetric(horizontal: 12.0),
             child: CustomScrollView(
               slivers: [
                 if (easyCases.isNotEmpty)
                   ..._buildSection('Facili', easyCases, caseTimes,
-                      getColorForTime, theme, ref),
+                      getColorForTime, theme, ref, crossAxisCount),
                 if (mediumCases.isNotEmpty)
                   ..._buildSection('Medi', mediumCases, caseTimes,
-                      getColorForTime, theme, ref),
+                      getColorForTime, theme, ref, crossAxisCount),
                 if (hardCases.isNotEmpty)
                   ..._buildSection('Difficili', hardCases, caseTimes,
-                      getColorForTime, theme, ref),
+                      getColorForTime, theme, ref, crossAxisCount),
                 if (unclassifiedCases.isNotEmpty)
                   ..._buildSection('Tutti', unclassifiedCases, caseTimes,
-                      getColorForTime, theme, ref),
+                      getColorForTime, theme, ref, crossAxisCount),
+                const SliverToBoxAdapter(child: SizedBox(height: 24)),
               ],
             ),
           ),
@@ -103,22 +102,24 @@ class _OllPllHeatmapState extends ConsumerState<OllPllHeatmap> {
     final categories = OllPllClassifier.getAlgSetsForPuzzle(activeCube);
     if (categories.isEmpty) return const SizedBox.shrink();
 
-    // Reset filter if active cube changed and current filter is invalid
     if (_currentFilter != 'Tutti' && !categories.contains(_currentFilter)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         setState(() => _currentFilter = 'Tutti');
       });
     }
 
-    return Padding(
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: SegmentedButton<String>(
+        showSelectedIcon: false,
         segments: [
           const ButtonSegment(value: 'Tutti', label: Text('Tutti')),
           ...categories.map((c) => ButtonSegment(value: c, label: Text(c))),
         ],
         selected: {_currentFilter},
         onSelectionChanged: (Set<String> newSelection) {
+          IosPlatformHelper.selectionClick();
           setState(() {
             _currentFilter = newSelection.first;
           });
@@ -151,7 +152,8 @@ class _OllPllHeatmapState extends ConsumerState<OllPllHeatmap> {
       Map<String, int?> caseTimes,
       Color Function(int?) colorFn,
       ThemeData theme,
-      WidgetRef ref) {
+      WidgetRef ref,
+      int crossAxisCount) {
     return [
       SliverToBoxAdapter(
         child: Padding(
@@ -164,8 +166,8 @@ class _OllPllHeatmapState extends ConsumerState<OllPllHeatmap> {
         ),
       ),
       SliverGrid(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 6,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
           childAspectRatio: 1.0,
@@ -174,23 +176,24 @@ class _OllPllHeatmapState extends ConsumerState<OllPllHeatmap> {
           (context, i) {
             final c = cases[i];
             final time = caseTimes[c.id];
-            // Main card has neutral background. Opacity 1
             final cardColor = theme.colorScheme.surfaceBright;
+            final borderColor =
+                time != null ? colorFn(time) : theme.colorScheme.surface;
 
             return GestureDetector(
-              onTap: () =>
-                  _showCaseDetails(context, ref, c, time, colorFn(time)),
+              onTap: () {
+                IosPlatformHelper.lightImpact();
+                _showCaseDetails(context, ref, c, time, colorFn(time));
+              },
               child: Container(
                 decoration: BoxDecoration(
                   color: cardColor,
                   borderRadius: BorderRadius.circular(8),
-                  border:
-                      Border.all(color: theme.colorScheme.surface, width: 2),
+                  border: Border.all(color: borderColor, width: 2),
                 ),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // Visual Algorithm
                     Padding(
                       padding: const EdgeInsets.all(4.0),
                       child: Opacity(
@@ -198,7 +201,6 @@ class _OllPllHeatmapState extends ConsumerState<OllPllHeatmap> {
                         child: PuzzleGridPreview(ollPllCase: c),
                       ),
                     ),
-                    // Small Text Label at bottom
                     Positioned(
                       bottom: 0,
                       left: 0,
@@ -206,14 +208,14 @@ class _OllPllHeatmapState extends ConsumerState<OllPllHeatmap> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.6),
+                          color: Colors.black.withValues(alpha: 0.65),
                           borderRadius: const BorderRadius.vertical(
                               bottom: Radius.circular(6)),
                         ),
                         child: Text(
                           c.name.split(' ').first,
                           style: const TextStyle(
-                            fontSize: 8,
+                            fontSize: 9,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
@@ -237,92 +239,107 @@ class _OllPllHeatmapState extends ConsumerState<OllPllHeatmap> {
       int? timeMs, Color heatColor) {
     showModalBottomSheet(
       context: context,
-      backgroundColor:
-          heatColor.withOpacity(0.9), // The real heatmap color is here
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      isScrollControlled: true,
+      backgroundColor: Color.alphaBlend(
+        heatColor.withValues(alpha: 0.25),
+        const Color(0xFF1E293B),
       ),
-      builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(c.name,
-                  style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white)),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.black87,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                width: 140,
-                height: 140,
-                child: PuzzleGridPreview(ollPllCase: c),
-              ),
-              const SizedBox(height: 24),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(8)),
-                child: Text(c.algorithm,
-                    style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.orangeAccent),
-                    textAlign: TextAlign.center),
-              ),
-              const SizedBox(height: 24),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                decoration: BoxDecoration(
-                    color: Colors.black38,
-                    borderRadius: BorderRadius.circular(24)),
-                child: Text(
-                  timeMs == null
-                      ? 'Non ancora allenato'
-                      : 'Miglior indicatore: ${(timeMs / 1000).toStringAsFixed(2)}s',
-                  style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    ref.read(currentOllPllCaseProvider.notifier).setCase(c);
-                    Navigator.pop(context); // close sheet
-
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const OllPllTimerScreen(),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('ALLENA QUESTO CASO',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) {
+        return SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 5,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white38,
+                    borderRadius: BorderRadius.circular(3),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-            ],
+                Text(c.name,
+                    style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white)),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black87,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  width: 136,
+                  height: 136,
+                  child: PuzzleGridPreview(ollPllCase: c),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(10)),
+                  child: Text(c.algorithm,
+                      style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orangeAccent),
+                      textAlign: TextAlign.center),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                  decoration: BoxDecoration(
+                      color: Colors.black38,
+                      borderRadius: BorderRadius.circular(24)),
+                  child: Text(
+                    timeMs == null
+                        ? 'Non ancora allenato'
+                        : 'Miglior indicatore: ${(timeMs / 1000).toStringAsFixed(2)}s',
+                    style: const TextStyle(
+                        fontSize: 15,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      IosPlatformHelper.mediumImpact();
+                      ref.read(currentOllPllCaseProvider.notifier).setCase(c);
+                      Navigator.pop(sheetCtx);
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const OllPllTimerScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: const Text('ALLENA QUESTO CASO',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },

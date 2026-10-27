@@ -1,5 +1,14 @@
 {
   "appId": "com.races30.cubetrainer",
   "appName": "CubeTrainer",
-  "webDir": "build/web"
+  "webDir": "build/web",
+  "backgroundColor": "#0F172A",
+  "zoomEnabled": false,
+  "ios": {
+    "backgroundColor": "#0F172A",
+    "contentInset": "never",
+    "allowsLinkPreview": false,
+    "scrollEnabled": false,
+    "preferredContentMode": "mobile"
+  }
 }

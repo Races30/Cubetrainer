@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/qr_migration_service.dart';
 import '../services/solve_repository.dart';
 import '../models/solve.dart';
+import '../utils/ios_platform_helper.dart';
 
 class QrScannerScreen extends ConsumerStatefulWidget {
   const QrScannerScreen({super.key});
@@ -28,7 +29,6 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
             QrMigrationService.decodeQrChunk(barcode.rawValue!, _scannedChunks);
 
         if (result.errorMessage != null) {
-          // Invalid format
           continue;
         }
 
@@ -40,6 +40,7 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
 
         if (result.isComplete && result.solves != null) {
           _isProcessing = true;
+          IosPlatformHelper.mediumImpact();
           cameraController.stop();
           _showImportPreview(result.solves!);
           break;
@@ -63,11 +64,11 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
           return AlertDialog(
               title: const Text('Dati scelti pronti!'),
               content: Text(
-                  'Rilevate $total solve.\nTempo migliore: ${best != null ? (best / 1000).toStringAsFixed(2) + 's' : '--'}'),
+                  'Rilevate $total solve.\nTempo migliore: ${best != null ? '${(best / 1000).toStringAsFixed(2)}s' : '--'}'),
               actions: [
                 TextButton(
                     onPressed: () {
-                      Navigator.pop(context); // close dialog
+                      Navigator.pop(context);
                       setState(() {
                         _scannedChunks.clear();
                         _totalChunks = 0;
@@ -78,7 +79,7 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
                     child: const Text('Annulla')),
                 FilledButton(
                     onPressed: () async {
-                      Navigator.pop(context); // close dialog
+                      Navigator.pop(context);
                       await _importSolves(solves);
                     },
                     child: const Text('Importa',
@@ -103,9 +104,6 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
             ])));
 
     for (var s in solves) {
-      // Check for exact duplicate matching timestamp AND scramble
-      // We might only want to match timestamp up to second if precision was lost,
-      // but since they are exported natively they should match exactly.
       final isDuplicate = existingSolves.any((ext) =>
           ext.date.microsecondsSinceEpoch == s.date.microsecondsSinceEpoch &&
           ext.scramble == s.scramble);
@@ -116,16 +114,18 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
     }
 
     if (mounted) {
-      Navigator.pop(context); // pop progress
+      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
               'Importate $imported nuove solve (saltati ${solves.length - imported} duplicati)')));
-      Navigator.pop(context); // Return to StatsScreen
+      Navigator.pop(context);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bottomSafe = MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
         appBar: AppBar(title: const Text('Scan QR Sessione')),
         body: Stack(children: [
@@ -135,16 +135,16 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
           ),
           Center(
               child: Container(
-            width: 250,
-            height: 250,
+            width: 240,
+            height: 240,
             decoration: BoxDecoration(
                 border: Border.all(color: const Color(0xFF38BDF8), width: 4),
                 borderRadius: BorderRadius.circular(16)),
           )),
           Positioned(
-              bottom: 60,
-              left: 0,
-              right: 0,
+              bottom: bottomSafe + 40,
+              left: 24,
+              right: 24,
               child: Center(
                   child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -155,8 +155,9 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
                           border: Border.all(color: const Color(0xFF38BDF8))),
                       child: Text(
                         _totalChunks > 0
-                            ? "Scansionate: ${_scannedChunks.length} di $_totalChunks part"
+                            ? "Scansionate: ${_scannedChunks.length} di $_totalChunks parti"
                             : "Inquadra il QR Code nel box",
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
                             color: Colors.white, fontWeight: FontWeight.bold),
                       )))),

@@ -6,6 +6,7 @@ import '../services/solve_repository.dart';
 import '../services/statistics_repository.dart';
 import '../services/deepseek_service.dart';
 import '../services/coach_repository.dart';
+import '../utils/ios_platform_helper.dart';
 
 class CoachScreen extends ConsumerStatefulWidget {
   const CoachScreen({super.key});
@@ -27,6 +28,9 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
   Future<void> _sendMessage() async {
     final String message = _messageController.text.trim();
     if (message.isEmpty) return;
+
+    FocusScope.of(context).unfocus();
+    IosPlatformHelper.lightImpact();
 
     final coachRepo = ref.read(coachRepositoryProvider);
 
@@ -92,59 +96,66 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
       });
     }
 
-    return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: messages.length,
-              itemBuilder: (context, index) {
-                final msg = messages[index];
-                final isUser = msg.role == 'user';
-                return Align(
-                  alignment:
-                      isUser ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 6),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.75),
-                    decoration: BoxDecoration(
-                      color: isUser
-                          ? theme.colorScheme.primary
-                          : theme.cardTheme.color,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(20),
-                        topRight: const Radius.circular(20),
-                        bottomLeft: Radius.circular(isUser ? 20 : 4),
-                        bottomRight: Radius.circular(isUser ? 4 : 20),
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.all(16),
+                itemCount: messages.length,
+                itemBuilder: (context, index) {
+                  final msg = messages[index];
+                  final isUser = msg.role == 'user';
+                  return Align(
+                    alignment:
+                        isUser ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.78),
+                      decoration: BoxDecoration(
+                        color: isUser
+                            ? theme.colorScheme.primary
+                            : theme.cardTheme.color,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(20),
+                          topRight: const Radius.circular(20),
+                          bottomLeft: Radius.circular(isUser ? 20 : 4),
+                          bottomRight: Radius.circular(isUser ? 4 : 20),
+                        ),
+                      ),
+                      child: SelectableText(
+                        msg.content,
+                        style: TextStyle(
+                          color: isUser ? Colors.black87 : Colors.white,
+                          fontSize: 15,
+                          height: 1.4,
+                        ),
                       ),
                     ),
-                    child: Text(
-                      msg.content,
-                      style: TextStyle(
-                        color: isUser ? Colors.black87 : Colors.white,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
-          _buildInputArea(theme),
-        ],
+            _buildInputArea(theme),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildInputArea(ThemeData theme) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
       ),
@@ -161,7 +172,10 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
               ),
               child: TextField(
                 controller: _messageController,
-                style: const TextStyle(fontSize: 14),
+                // 16px prevents iOS WebKit auto-zoom on focus
+                style: const TextStyle(fontSize: 16),
+                textInputAction: TextInputAction.send,
+                onTapOutside: (_) => FocusScope.of(context).unfocus(),
                 decoration: const InputDecoration(
                   hintText: 'Chiedi al coach...',
                   border: InputBorder.none,
@@ -178,13 +192,17 @@ class _CoachScreenState extends ConsumerState<CoachScreen> {
                   child: Padding(
                       padding: EdgeInsets.all(12),
                       child: CircularProgressIndicator(strokeWidth: 2)))
-              : FloatingActionButton.small(
-                  onPressed: _sendMessage,
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: Colors.black87,
-                  elevation: 0,
-                  heroTag: 'coach_send_fab',
-                  child: const Icon(Icons.send_rounded, size: 18),
+              : SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: FloatingActionButton(
+                    onPressed: _sendMessage,
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: Colors.black87,
+                    elevation: 0,
+                    heroTag: 'coach_send_fab',
+                    child: const Icon(Icons.send_rounded, size: 20),
+                  ),
                 ),
         ],
       ),

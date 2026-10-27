@@ -9,6 +9,7 @@ import 'coach_screen.dart';
 import '../providers/session_provider.dart';
 import '../services/solve_repository.dart';
 import '../services/home_widget_helper.dart';
+import '../utils/ios_platform_helper.dart';
 
 class HomeNav extends ConsumerStatefulWidget {
   const HomeNav({super.key});
@@ -42,21 +43,27 @@ class _HomeNavState extends ConsumerState<HomeNav> {
 
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: 50,
         title: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          constraints: const BoxConstraints(minHeight: 40),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
           decoration: BoxDecoration(
-            color: theme.colorScheme.primary.withValues(alpha: 0.1),
+            color: theme.colorScheme.primary.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-                color: theme.colorScheme.primary.withValues(alpha: 0.2)),
+              color: theme.colorScheme.primary.withValues(alpha: 0.25),
+            ),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<CubeType>(
               value: selectedCubeType,
-              dropdownColor: theme.colorScheme.surface,
+              isDense: true,
+              dropdownColor: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(16),
               iconEnabledColor: theme.colorScheme.primary,
               onChanged: (CubeType? newValue) {
                 if (newValue != null) {
+                  IosPlatformHelper.selectionClick();
                   ref.read(selectedCubeTypeProvider.notifier).state = newValue;
                 }
               },
@@ -64,11 +71,15 @@ class _HomeNavState extends ConsumerState<HomeNav> {
                   .map<DropdownMenuItem<CubeType>>((CubeType value) {
                 return DropdownMenuItem<CubeType>(
                   value: value,
-                  child: Text(
-                    value.label,
-                    style: TextStyle(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.bold,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      value.label,
+                      style: TextStyle(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
                     ),
                   ),
                 );
@@ -80,7 +91,13 @@ class _HomeNavState extends ConsumerState<HomeNav> {
       body: _pages[_index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        onDestinationSelected: (i) {
+          if (_index != i) {
+            FocusScope.of(context).unfocus();
+            IosPlatformHelper.selectionClick();
+            setState(() => _index = i);
+          }
+        },
         destinations: const [
           NavigationDestination(icon: Icon(Icons.shuffle), label: 'Scramble'),
           NavigationDestination(icon: Icon(Icons.timer), label: 'Timer'),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/oll_pll_provider.dart';
 import '../utils/formatters.dart';
+import '../utils/ios_platform_helper.dart';
 import '../providers/selected_cube_type.dart';
 import '../services/oll_pll_data.dart';
 import '../services/oll_pll_classifier.dart';
@@ -31,13 +32,15 @@ class _OllPllSelectionScreenState extends ConsumerState<OllPllSelectionScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Allenamento ${OllPllClassifier.getLabelForPuzzle(activeCube)}'),
+        title: Text(
+            'Allenamento ${OllPllClassifier.getLabelForPuzzle(activeCube)}'),
         actions: [
           IconButton(
             icon: const Icon(Icons.shuffle),
             tooltip: 'Allenamento Misto',
             onPressed: () {
               if (cases.isNotEmpty) {
+                IosPlatformHelper.lightImpact();
                 ref.read(currentOllPllCaseProvider.notifier).unlock();
                 ref.read(currentOllPllCaseProvider.notifier).nextRandomCase();
                 Navigator.of(context).push(
@@ -48,15 +51,19 @@ class _OllPllSelectionScreenState extends ConsumerState<OllPllSelectionScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildDynamicFilterTabs(context, activeCube),
-          Expanded(
-            child: CustomScrollView(
-              slivers: _buildGroupedSlivers(context, ref, cases),
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: Column(
+          children: [
+            _buildDynamicFilterTabs(context, activeCube),
+            Expanded(
+              child: CustomScrollView(
+                slivers: _buildGroupedSlivers(context, ref, cases),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -72,15 +79,18 @@ class _OllPllSelectionScreenState extends ConsumerState<OllPllSelectionScreen> {
       });
     }
 
-    return Padding(
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       child: SegmentedButton<String>(
+        showSelectedIcon: false,
         segments: [
           const ButtonSegment(value: 'Tutti', label: Text('Tutti')),
           ...categories.map((c) => ButtonSegment(value: c, label: Text(c))),
         ],
         selected: {_currentFilter},
         onSelectionChanged: (Set<String> newSelection) {
+          IosPlatformHelper.selectionClick();
           setState(() {
             _currentFilter = newSelection.first;
           });
@@ -138,7 +148,7 @@ class _OllPllSelectionScreenState extends ConsumerState<OllPllSelectionScreen> {
       if (hardCases.isNotEmpty) ..._buildSection('Difficili', hardCases, ref),
       if (unclassifiedCases.isNotEmpty)
         ..._buildSection('Tutti', unclassifiedCases, ref),
-      const SliverToBoxAdapter(child: SizedBox(height: 32)), // Bottom padding
+      const SliverToBoxAdapter(child: SizedBox(height: 32)),
     ];
   }
 
@@ -146,7 +156,7 @@ class _OllPllSelectionScreenState extends ConsumerState<OllPllSelectionScreen> {
       String title, List<OllPllCase> cases, WidgetRef ref) {
     return [
       SliverPadding(
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
         sliver: SliverToBoxAdapter(
           child: Text(
             title,
@@ -164,8 +174,8 @@ class _OllPllSelectionScreenState extends ConsumerState<OllPllSelectionScreen> {
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             childAspectRatio: 0.85,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
           ),
           delegate: SliverChildBuilderDelegate(
             (context, index) {
@@ -177,6 +187,7 @@ class _OllPllSelectionScreenState extends ConsumerState<OllPllSelectionScreen> {
 
               return InkWell(
                 onTap: () {
+                  IosPlatformHelper.lightImpact();
                   ref.read(currentOllPllCaseProvider.notifier).setCase(c);
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -188,18 +199,20 @@ class _OllPllSelectionScreenState extends ConsumerState<OllPllSelectionScreen> {
                 child: Card(
                   margin: EdgeInsets.zero,
                   child: Padding(
-                    padding: const EdgeInsets.all(12.0),
+                    padding: const EdgeInsets.all(10.0),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        PuzzleGridPreview(ollPllCase: c, size: 60),
-                        const SizedBox(height: 12),
+                        PuzzleGridPreview(ollPllCase: c, size: 58),
+                        const SizedBox(height: 10),
                         Text(
                           c.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontWeight: FontWeight.bold),
                           textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Text(
                           'Solves: $count',
                           style:

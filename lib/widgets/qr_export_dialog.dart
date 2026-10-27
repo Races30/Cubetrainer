@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -34,7 +35,6 @@ class _QrExportDialogState extends State<QrExportDialog> {
   }
 
   Future<void> _generateQRs() async {
-    // Run chunking off the main thread if it's too large, but for standard solves it should be very fast
     chunks = QrMigrationService.encodeSolvesToQrChunks(widget.solves);
     setState(() {
       _isGenerating = false;
@@ -107,16 +107,19 @@ class _QrExportDialogState extends State<QrExportDialog> {
       );
     }
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final qrBoxSize = math.min(240.0, screenWidth - 96.0);
+
     return Dialog(
       backgroundColor: const Color(0xFF1E293B),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              "Esporta Sessione (\u{1F4E6} ${widget.cubeTypeLabel})",
+              "Esporta Sessione (${widget.cubeTypeLabel})",
               style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -131,10 +134,10 @@ class _QrExportDialogState extends State<QrExportDialog> {
               style: const TextStyle(fontSize: 12, color: Colors.grey),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             SizedBox(
-              height: 250,
-              width: 250,
+              height: qrBoxSize,
+              width: qrBoxSize,
               child: PageView.builder(
                 controller: _pageController,
                 onPageChanged: (index) {
@@ -146,12 +149,15 @@ class _QrExportDialogState extends State<QrExportDialog> {
                     child: RepaintBoundary(
                       key: index == _currentPage ? _qrKey : null,
                       child: Container(
-                        color: Colors.white,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.all(8),
                         child: QrImageView(
                           data: chunks[index],
                           version: QrVersions.auto,
-                          size: 234,
+                          size: qrBoxSize - 16,
                           gapless: false,
                           errorCorrectionLevel: QrErrorCorrectLevel.L,
                         ),
@@ -161,7 +167,7 @@ class _QrExportDialogState extends State<QrExportDialog> {
                 },
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             if (chunks.length > 1)
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -186,19 +192,24 @@ class _QrExportDialogState extends State<QrExportDialog> {
                   ),
                 ],
               ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.share),
-              label: const Text("Condividi Immagine"),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF38BDF8),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.share, size: 18),
+                label: const Text("Condividi Immagine",
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF38BDF8),
+                  foregroundColor: Colors.black87,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: _shareQrCode,
               ),
-              onPressed: _shareQrCode,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text("Chiudi", style: TextStyle(color: Colors.grey)),

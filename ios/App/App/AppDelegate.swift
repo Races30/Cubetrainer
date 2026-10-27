@@ -1,49 +1,170 @@
 import UIKit
+import WebKit
 import Capacitor
+
+private final class IosHapticsHandler: NSObject, WKScriptMessageHandler {
+    private let lightGenerator = UIImpactFeedbackGenerator(style: .light)
+    private let mediumGenerator = UIImpactFeedbackGenerator(style: .medium)
+    private let heavyGenerator = UIImpactFeedbackGenerator(style: .heavy)
+    private let selectionGenerator = UISelectionFeedbackGenerator()
+    private let notificationGenerator = UINotificationFeedbackGenerator()
+
+    override init() {
+        super.init()
+        lightGenerator.prepare()
+        mediumGenerator.prepare()
+        heavyGenerator.prepare()
+        selectionGenerator.prepare()
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        let style = (message.body as? String)?.lowercased() ?? "light"
+        DispatchQueue.main.async {
+            switch style {
+            case "heavy":
+                self.heavyGenerator.impactOccurred()
+                self.heavyGenerator.prepare()
+            case "medium":
+                self.mediumGenerator.impactOccurred()
+                self.mediumGenerator.prepare()
+            case "selection":
+                self.selectionGenerator.selectionChanged()
+                self.selectionGenerator.prepare()
+            case "success":
+                self.notificationGenerator.notificationOccurred(.success)
+            case "warning":
+                self.notificationGenerator.notificationOccurred(.warning)
+            case "error":
+                self.notificationGenerator.notificationOccurred(.error)
+            default:
+                self.lightGenerator.impactOccurred()
+                self.lightGenerator.prepare()
+            }
+        }
+    }
+}
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
+    private let hapticsHandler = IosHapticsHandler()
+    private var didRegisterBridge = false
+
+    private let deepNavyColor = UIColor(
+        red: 15.0 / 255.0,
+        green: 23.0 / 255.0,
+        blue: 42.0 / 255.0,
+        alpha: 1.0
+    )
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        application.isIdleTimerDisabled = true
+
+        window?.overrideUserInterfaceStyle = .dark
+        window?.backgroundColor = deepNavyColor
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(syncSafeAreaInsets),
+            name: UIDevice.orientationDidChangeNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(onCapViewDidAppear),
+            name: Notification.Name(rawValue: "CapacitorViewDidAppear"),
+            object: nil
+        )
+
+        DispatchQueue.main.async { [weak self] in
+            self?.configureBridgeWebView()
+        }
+
         return true
     }
 
+    @objc private func onCapViewDidAppear() {
+        configureBridgeWebView()
+        syncSafeAreaInsets()
+    }
+
+    private func configureBridgeWebView() {
+        window?.overrideUserInterfaceStyle = .dark
+        window?.backgroundColor = deepNavyColor
+
+        guard let capVC = window?.rootViewController as? CAPBridgeViewController,
+              let webView = capVC.webView else {
+            return
+        }
+
+        capVC.overrideUserInterfaceStyle = .dark
+        capVC.setStatusBarStyle(.lightContent)
+
+        webView.isOpaque = false
+        webView.backgroundColor = deepNavyColor
+        webView.scrollView.backgroundColor = deepNavyColor
+        webView.scrollView.bounces = false
+        webView.scrollView.alwaysBounceVertical = false
+        webView.scrollView.alwaysBounceHorizontal = false
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.allowsLinkPreview = false
+
+        if !didRegisterBridge {
+            didRegisterBridge = true
+            webView.configuration.userContentController.removeScriptMessageHandler(forName: "iosHaptics")
+            webView.configuration.userContentController.add(hapticsHandler, name: "iosHaptics")
+        }
+
+        syncSafeAreaInsets()
+    }
+
+    @objc private func syncSafeAreaInsets() {
+        guard let win = window,
+              let capVC = win.rootViewController as? CAPBridgeViewController,
+              let webView = capVC.webView else {
+            return
+        }
+
+        let insets = win.safeAreaInsets
+        let js = """
+        window.__nativeSafeAreaInsets = {
+          top: \(insets.top),
+          bottom: \(insets.bottom),
+          left: \(insets.left),
+          right: \(insets.right)
+        };
+        window.dispatchEvent(new CustomEvent('ios-safe-area-change'));
+        """
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+
     func applicationWillResignActive(_ application: UIApplication) {
-        // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
-        // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.
     }
 
     func applicationDidEnterBackground(_ application: UIApplication) {
-        // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
-        // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
+        application.isIdleTimerDisabled = false
     }
 
     func applicationWillEnterForeground(_ application: UIApplication) {
-        // Called as part of the transition from the background to the active state; here you can undo many of the changes made on entering the background.
+        application.isIdleTimerDisabled = true
+        syncSafeAreaInsets()
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+        application.isIdleTimerDisabled = true
+        configureBridgeWebView()
+        syncSafeAreaInsets()
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
-        // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        // Called when the app was launched with a url. Feel free to add additional processing here,
-        // but if you want the App API to support tracking app url opens, make sure to keep this call
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
     }
 
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
-        // Called when the app was launched with an activity, including Universal Links.
-        // Feel free to add additional processing here, but if you want the App API to support
-        // tracking app url opens, make sure to keep this call
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
-
 }

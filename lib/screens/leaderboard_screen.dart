@@ -5,6 +5,7 @@ import '../models/solve.dart';
 import '../services/leaderboard_service.dart';
 import '../models/leaderboard_entry.dart';
 import '../providers/selected_cube_type.dart';
+import '../utils/ios_platform_helper.dart';
 import 'package:intl/intl.dart';
 
 class LeaderboardScreen extends ConsumerStatefulWidget {
@@ -28,36 +29,45 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
       appBar: AppBar(
         title: const Text('Leaderboard Locale'),
       ),
-      body: StreamBuilder(
-        stream: leaderboardService.watchEntries(),
-        builder: (context, snapshot) {
-          final entries =
-              leaderboardService.getEntries(_selectedMode, selectedCubeLabel);
+      body: SafeArea(
+        top: false,
+        bottom: true,
+        child: StreamBuilder(
+          stream: leaderboardService.watchEntries(),
+          builder: (context, snapshot) {
+            final entries =
+                leaderboardService.getEntries(_selectedMode, selectedCubeLabel);
 
-          return Column(
-            children: [
-              _buildFilters(theme, selectedCubeLabel),
-              const Divider(height: 1),
-              _buildHeader(theme),
-              Expanded(
-                child: entries.isEmpty
-                    ? Center(
-                        child: Text(
-                          'Nessun tempo registrato per questa categoria.',
-                          style: TextStyle(color: Colors.grey[600]),
+            return Column(
+              children: [
+                _buildFilters(theme, selectedCubeLabel),
+                const Divider(height: 1),
+                _buildHeader(theme),
+                Expanded(
+                  child: entries.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Text(
+                              'Nessun tempo registrato per questa categoria.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          itemCount: entries.length,
+                          itemBuilder: (context, index) {
+                            final entry = entries[index];
+                            return _buildEntryItem(context, entry, index);
+                          },
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: entries.length,
-                        itemBuilder: (context, index) {
-                          final entry = entries[index];
-                          return _buildEntryItem(context, entry, index);
-                        },
-                      ),
-              ),
-            ],
-          );
-        },
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -70,12 +80,14 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
         .toList();
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           DropdownButton<String>(
             value: _selectedMode,
+            dropdownColor: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(12),
             items: modes.map((m) {
               return DropdownMenuItem(
                 value: m,
@@ -83,7 +95,10 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               );
             }).toList(),
             onChanged: (val) {
-              if (val != null) setState(() => _selectedMode = val);
+              if (val != null) {
+                IosPlatformHelper.selectionClick();
+                setState(() => _selectedMode = val);
+              }
             },
             underline: Container(
               height: 2,
@@ -146,6 +161,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
         child: const Icon(Icons.delete, color: Colors.white),
       ),
       confirmDismiss: (_) async {
+        IosPlatformHelper.lightImpact();
         return await showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -187,6 +203,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
             fontSize: 18,
             color: color,
             fontFamily: 'monospace',
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
         trailing: Text(

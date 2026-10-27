@@ -7,8 +7,8 @@ import '../services/scramble_generator.dart';
 import '../services/statistics_repository.dart';
 import '../providers/session_provider.dart';
 import '../services/cross_solver.dart';
+import '../utils/ios_platform_helper.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:flutter/services.dart';
 
 import '../widgets/training_timer.dart';
 
@@ -52,7 +52,6 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
   }
 
   void _onStart() {
-    // Optional: generate next scramble on start
     if (_crossSolution != null) {
       setState(() => _crossSolution = null);
     }
@@ -101,12 +100,23 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
       _lastSplitTime = now;
     });
 
-    HapticFeedback.lightImpact();
+    IosPlatformHelper.lightImpact();
+  }
+
+  double _scrambleFontSize(String? scramble, bool isCompact) {
+    final len = scramble?.length ?? 0;
+    if (len > 240) return isCompact ? 12.5 : 13.5;
+    if (len > 140) return isCompact ? 13.5 : 15.0;
+    return isCompact ? 15.5 : 17.5;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isCompactScreen = screenHeight < 740;
+    final maxRecentSolves = isCompactScreen ? 2 : 3;
+
     final activeScramble =
         ref.watch(scrambleGeneratorProvider(widget.cubeType)).activeScramble;
     final activeSession = ref.watch(activeSessionProvider);
@@ -130,17 +140,17 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+        padding: EdgeInsets.fromLTRB(16, isCompactScreen ? 8 : 14, 16, 8),
         child: Column(
           children: [
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(isCompactScreen ? 14 : 16),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.1)),
+                    color: theme.colorScheme.primary.withValues(alpha: 0.12)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,15 +169,29 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                             context, activeSession, availableSessions),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(activeScramble ?? 'Pronto per iniziare...',
-                      style: const TextStyle(
-                          fontSize: 18,
-                          height: 1.4,
-                          fontWeight: FontWeight.w500),
-                      textAlign: TextAlign.center),
+                  const SizedBox(height: 6),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: isCompactScreen ? 72 : 104,
+                    ),
+                    child: SingleChildScrollView(
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: Text(
+                          activeScramble ?? 'Pronto per iniziare...',
+                          style: TextStyle(
+                            fontSize: _scrambleFontSize(
+                                activeScramble, isCompactScreen),
+                            height: 1.35,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ),
                   if (!isTimerActive) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         if (widget.cubeType == CubeType.threeByThree)
@@ -200,8 +224,8 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                             style: TextButton.styleFrom(
                               foregroundColor: Colors.orangeAccent,
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 0),
-                              minimumSize: Size.zero,
+                                  horizontal: 10, vertical: 6),
+                              minimumSize: const Size(44, 36),
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
                           ),
@@ -211,13 +235,14 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                                 TextStyle(color: Colors.white70, fontSize: 13)),
                         const SizedBox(width: 8),
                         SizedBox(
-                          height: 24,
+                          height: 28,
                           child: FittedBox(
                             fit: BoxFit.fill,
                             child: Switch(
                               value: _useInspection,
                               activeThumbColor: theme.colorScheme.primary,
                               onChanged: (val) {
+                                IosPlatformHelper.selectionClick();
                                 setState(() => _useInspection = val);
                               },
                             ),
@@ -227,10 +252,11 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                     ),
                     if (_crossSolution != null)
                       Padding(
-                        padding: const EdgeInsets.only(top: 12),
+                        padding: const EdgeInsets.only(top: 8),
                         child: Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
                             color: Colors.orangeAccent.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
@@ -247,10 +273,10 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                                       color: Colors.orangeAccent,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 1.2)),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 2),
                               Text(_crossSolution!.join(' '),
                                   style: const TextStyle(
-                                      fontSize: 18,
+                                      fontSize: 16,
                                       fontWeight: FontWeight.bold)),
                             ],
                           ),
@@ -281,7 +307,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                   if (_timerState == TimerState.running &&
                       widget.cubeType == CubeType.threeByThree)
                     Positioned(
-                      bottom: 32,
+                      bottom: 12,
                       left: 0,
                       right: 0,
                       child: Center(
@@ -289,10 +315,12 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                           behavior: HitTestBehavior.opaque,
                           onTap: _onSplitTapped,
                           child: Container(
+                            constraints: const BoxConstraints(minHeight: 48),
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 40, vertical: 20),
+                                horizontal: 32, vertical: 14),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.primary.withOpacity(0.2),
+                              color: theme.colorScheme.primary
+                                  .withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(30),
                               border: Border.all(
                                   color: theme.colorScheme.primary, width: 2),
@@ -302,7 +330,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                                   ? 'SPLIT: ${_splitLabels[_currentSplits.length]}'
                                   : 'SPLITS FATTI',
                               style: TextStyle(
-                                fontSize: 24,
+                                fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 color: theme.colorScheme.primary,
                               ),
@@ -319,25 +347,32 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                   alignment: Alignment.centerLeft,
                   child: Text('RECENT SOLVES',
                       style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.2,
                           color: Colors.grey))),
-              const SizedBox(height: 8),
-              ...solves.take(3).map((solve) {
+              const SizedBox(height: 6),
+              ...solves.take(maxRecentSolves).map((solve) {
                 final isDnf = solve.penalty == 'DNF';
                 final isPlus2 = solve.penalty == '+2';
 
                 return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
+                  margin: const EdgeInsets.only(bottom: 6),
                   child: ListTile(
+                    dense: isCompactScreen,
+                    visualDensity: isCompactScreen
+                        ? VisualDensity.compact
+                        : VisualDensity.standard,
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
                     title: Row(
                       children: [
                         Text(
                           statsRepo.formatMs(solve.timeMs),
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 18,
+                            fontSize: 17,
+                            fontFeatures: const [FontFeature.tabularFigures()],
                             decoration:
                                 isDnf ? TextDecoration.lineThrough : null,
                             color: isDnf ? Colors.grey : null,
@@ -350,7 +385,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                               '(+2)',
                               style: TextStyle(
                                   color: Colors.red[400],
-                                  fontSize: 14,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -361,14 +396,15 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                               'DNF',
                               style: TextStyle(
                                   color: Colors.red[400],
-                                  fontSize: 14,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.bold),
                             ),
                           ),
                       ],
                     ),
                     subtitle: Text(solve.cubeType?.label ?? solve.cube,
-                        style: TextStyle(color: theme.colorScheme.primary)),
+                        style: TextStyle(
+                            color: theme.colorScheme.primary, fontSize: 12)),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -376,9 +412,10 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                         IconButton(
                           icon: const Text('+2',
                               style: TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 16)),
+                                  fontWeight: FontWeight.bold, fontSize: 15)),
                           color: isPlus2 ? Colors.orange : Colors.grey,
                           onPressed: () {
+                            IosPlatformHelper.selectionClick();
                             final newPenalty = isPlus2 ? '' : '+2';
                             _quickUpdatePenalty(solve, newPenalty);
                           },
@@ -390,6 +427,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                                   fontWeight: FontWeight.bold, fontSize: 12)),
                           color: isDnf ? Colors.red : Colors.grey,
                           onPressed: () {
+                            IosPlatformHelper.selectionClick();
                             final newPenalty = isDnf ? '' : 'DNF';
                             _quickUpdatePenalty(solve, newPenalty);
                           },
@@ -397,10 +435,13 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                         // Delete Button
                         IconButton(
                           icon: const Icon(Icons.delete_outline,
-                              color: Colors.redAccent),
-                          onPressed: () => ref
-                              .read(solveRepositoryProvider)
-                              .deleteSolve(solve.id),
+                              color: Colors.redAccent, size: 20),
+                          onPressed: () {
+                            IosPlatformHelper.lightImpact();
+                            ref
+                                .read(solveRepositoryProvider)
+                                .deleteSolve(solve.id);
+                          },
                         ),
                       ],
                     ),
@@ -408,7 +449,6 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                 );
               }),
             ],
-            if (!isTimerActive) const SizedBox(height: 80),
           ],
         ),
       ),
@@ -424,6 +464,8 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
       penalty: penalty,
       date: solve.date,
       cubeType: solve.cubeType,
+      sessionId: solve.sessionId,
+      splits: solve.splits,
     );
     await ref.read(solveRepositoryProvider).updateSolve(updated);
   }
@@ -438,6 +480,8 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         child: DropdownButton<String>(
             value: activeSession,
             isDense: true,
+            borderRadius: BorderRadius.circular(12),
+            dropdownColor: const Color(0xFF1E293B),
             style: TextStyle(
                 color: Theme.of(context).colorScheme.primary,
                 fontSize: 13,
@@ -456,6 +500,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
               if (val == '_new_') {
                 _showNewSessionDialog();
               } else if (val != null) {
+                IosPlatformHelper.selectionClick();
                 ref.read(activeSessionProvider.notifier).setSession(val);
               }
             }));
@@ -469,6 +514,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                 title: const Text('Nuova Sessione'),
                 content: TextField(
                   controller: tc,
+                  style: const TextStyle(fontSize: 16),
                   decoration: const InputDecoration(
                       labelText: 'Nome Sessione', hintText: 'es. One-Handed'),
                   autofocus: true,

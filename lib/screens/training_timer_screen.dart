@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../models/exercise_type.dart';
 import '../models/solve.dart';
 import '../models/training_solve.dart';
@@ -9,6 +9,7 @@ import '../models/training_session.dart';
 import '../services/training_repository.dart';
 import '../services/training_scrambler.dart';
 import '../services/goal_repository.dart';
+import '../utils/ios_platform_helper.dart';
 import '../widgets/goal_banner.dart';
 import '../widgets/goal_setup_sheet.dart';
 import 'training_report_screen.dart';
@@ -38,7 +39,7 @@ class TrainingTimerScreen extends ConsumerStatefulWidget {
 
 class _TrainingTimerScreenState extends ConsumerState<TrainingTimerScreen> {
   final String _sessionId = const Uuid().v4();
-  ExerciseType _currentType = ExerciseType.cross; // Initialized in initState
+  ExerciseType _currentType = ExerciseType.cross;
 
   final List<TrainingSolve> _sessionSolves = [];
   String _currentScramble = '';
@@ -54,21 +55,26 @@ class _TrainingTimerScreenState extends ConsumerState<TrainingTimerScreen> {
   @override
   void initState() {
     super.initState();
+    WakelockPlus.enable();
     _useInspection = widget.useInspection;
     _currentType = widget.initialType;
     _setupPhases();
     _generateNextScramble();
   }
 
+  @override
+  void dispose() {
+    WakelockPlus.disable();
+    super.dispose();
+  }
+
   void _onTypeChanged(ExerciseType? newType) {
     if (newType == null || newType == _currentType) return;
+    IosPlatformHelper.selectionClick();
     setState(() {
       _currentType = newType;
       _setupPhases();
-      _generateNextScramble(); // Regenerate scramble immediately for new type
-      // Reset current phase tracking if mid-solve?
-      // Assuming user changes type while stopped.
-      // If running, we might want to disable changes.
+      _generateNextScramble();
     });
   }
 
@@ -104,8 +110,6 @@ class _TrainingTimerScreenState extends ConsumerState<TrainingTimerScreen> {
     setState(() {});
   }
 
-  // ... (keep _onStart, _onPhaseComplete as is)
-
   void _onStart() {
     setState(() {
       _currentPhases = {};
@@ -127,7 +131,7 @@ class _TrainingTimerScreenState extends ConsumerState<TrainingTimerScreen> {
     if (_currentPhases.length >= _phaseLabels.length) {
       _timerKey.currentState?.forceStop();
     } else {
-      HapticFeedback.mediumImpact();
+      IosPlatformHelper.mediumImpact();
     }
   }
 
@@ -148,7 +152,7 @@ class _TrainingTimerScreenState extends ConsumerState<TrainingTimerScreen> {
       totalTimeMs: totalTimeMs,
       phaseTimes: Map.from(_currentPhases),
       sessionId: _sessionId,
-      sessionType: _currentType, // Use current active type
+      sessionType: _currentType,
       date: DateTime.now(),
     );
 
@@ -178,7 +182,7 @@ class _TrainingTimerScreenState extends ConsumerState<TrainingTimerScreen> {
     // Check goals
     final achievement =
         ref.read(sessionGoalProvider.notifier).checkGoalAchievement(
-              currentAo5: _currentAvg5, // Need these getters
+              currentAo5: _currentAvg5,
               currentAo12: _currentAvg12,
               currentBest: _currentBest.toDouble(),
               currentSolveCount: _sessionSolves.length,
@@ -199,15 +203,10 @@ class _TrainingTimerScreenState extends ConsumerState<TrainingTimerScreen> {
           behavior: SnackBarBehavior.floating,
         ),
       );
-      // Optional: Confetti or sounds here
     }
 
-    // Infinite mode: just generate next
     if (mounted) {
       setState(() {
-        // The instruction seems to want to remove _currentSolveIndex++
-        // and potentially update the title, but the title update is out of place here.
-        // Assuming the intent is to remove the index usage and      setState(() {
         _generateNextScramble();
       });
     }
@@ -223,7 +222,6 @@ class _TrainingTimerScreenState extends ConsumerState<TrainingTimerScreen> {
         _sessionSolves.map((s) => s.totalTimeMs).reduce((a, b) => a + b) /
             _sessionSolves.length;
 
-    // Determine session type: if all same, use that, else mixed
     final firstType = _sessionSolves.first.sessionType;
     final isMixed = _sessionSolves.any((s) => s.sessionType != firstType);
     final finalType = isMixed ? ExerciseType.mixed : firstType;
@@ -234,7 +232,7 @@ class _TrainingTimerScreenState extends ConsumerState<TrainingTimerScreen> {
       date: DateTime.now(),
       totalSolves: _sessionSolves.length,
       targetMs: (widget.targetTime * 1000).toInt(),
-      evaluationMode: EvaluationMode.avg, // Default for free training
+      evaluationMode: EvaluationMode.avg,
       metadata: {
         'average': avg.toStringAsFixed(2),
         'mode': 'free_training',
@@ -255,8 +253,6 @@ class _TrainingTimerScreenState extends ConsumerState<TrainingTimerScreen> {
       ),
     );
   }
-
-  // ... (keep helpers _currentAvg, _currentBest, _getTargetColor)
 
   double get _currentAvg {
     if (_sessionSolves.isEmpty) return 0.0;
@@ -291,7 +287,6 @@ class _TrainingTimerScreenState extends ConsumerState<TrainingTimerScreen> {
 
   Color _getTargetColor() {
     final targetMs = widget.targetTime * 1000;
-    // Always use AVG for color coding in free mode, simpler
     final value = _currentAvg;
     if (value == 0) return Colors.grey;
     if (value <= targetMs) return Colors.green;
@@ -315,7 +310,8 @@ class _TrainingTimerScreenState extends ConsumerState<TrainingTimerScreen> {
                 value: _currentType,
                 underline: const SizedBox(),
                 icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-                dropdownColor: theme.colorScheme.surface,
+                dropdownColor: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(14),
                 onChanged: _onTypeChanged,
                 items: ExerciseType.values
                     .where((e) =>
@@ -338,6 +334,7 @@ class _TrainingTimerScreenState extends ConsumerState<TrainingTimerScreen> {
                 IconButton(
                   icon: const Icon(Icons.flag_outlined),
                   onPressed: () {
+                    IosPlatformHelper.lightImpact();
                     showModalBottomSheet(
                       context: context,
                       isScrollControlled: true,
@@ -353,84 +350,92 @@ class _TrainingTimerScreenState extends ConsumerState<TrainingTimerScreen> {
                 ),
               ],
             ),
-      body: Column(
-        children: [
-          if (!isTimerActive)
-            GoalBanner(
-              currentAo5: _currentAvg5,
-              currentAo12: _currentAvg12,
-              currentBest: _currentBest / 1000.0,
-              currentSolveCount: _sessionSolves.length,
-            ),
-          if (!isTimerActive) _buildSessionHeader(theme, targetColor),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              children: [
-                Text(
-                  _currentScramble,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontFamily: 'monospace',
-                    color: Colors.white70,
-                  ),
-                ),
-                if (!isTimerActive) ...[
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      const Text('Ispezione 15s',
-                          style:
-                              TextStyle(color: Colors.white70, fontSize: 13)),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        height: 24,
-                        child: FittedBox(
-                          fit: BoxFit.fill,
-                          child: Switch(
-                            value: _useInspection,
-                            activeThumbColor: targetColor,
-                            onChanged: (val) {
-                              setState(() => _useInspection = val);
-                            },
-                          ),
+      body: SafeArea(
+        top: isTimerActive,
+        bottom: true,
+        child: Column(
+          children: [
+            if (!isTimerActive)
+              GoalBanner(
+                currentAo5: _currentAvg5,
+                currentAo12: _currentAvg12,
+                currentBest: _currentBest / 1000.0,
+                currentSolveCount: _sessionSolves.length,
+              ),
+            if (!isTimerActive) _buildSessionHeader(theme, targetColor),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 110),
+                    child: SingleChildScrollView(
+                      child: Text(
+                        _currentScramble,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontFamily: 'monospace',
+                          color: Colors.white70,
+                          fontSize: _currentScramble.length > 160 ? 13.5 : 16,
                         ),
                       ),
-                    ],
+                    ),
                   ),
+                  if (!isTimerActive) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        const Text('Ispezione 15s',
+                            style:
+                                TextStyle(color: Colors.white70, fontSize: 13)),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          height: 28,
+                          child: FittedBox(
+                            fit: BoxFit.fill,
+                            child: Switch(
+                              value: _useInspection,
+                              activeThumbColor: targetColor,
+                              onChanged: (val) {
+                                IosPlatformHelper.selectionClick();
+                                setState(() => _useInspection = val);
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          Expanded(
-            child: TrainingTimer(
-              key: _timerKey,
-              useInspection: _useInspection,
-              manualInspection: widget.manualInspection,
-              currentPhaseLabel: _currentPhases.length < _phaseLabels.length
-                  ? _phaseLabels[_currentPhases.length]
-                  : null,
-              onStart: _onStart,
-              onStop: _onStop,
-              onPhaseComplete: _onPhaseComplete,
-              onStateChanged: (state) {
-                if (mounted && _timerState != state) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) setState(() => _timerState = state);
-                  });
-                }
-              },
+            Expanded(
+              child: TrainingTimer(
+                key: _timerKey,
+                useInspection: _useInspection,
+                manualInspection: widget.manualInspection,
+                currentPhaseLabel: _currentPhases.length < _phaseLabels.length
+                    ? _phaseLabels[_currentPhases.length]
+                    : null,
+                onStart: _onStart,
+                onStop: _onStop,
+                onPhaseComplete: _onPhaseComplete,
+                onStateChanged: (state) {
+                  if (mounted && _timerState != state) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) setState(() => _timerState = state);
+                    });
+                  }
+                },
+              ),
             ),
-          ),
-          if (!isTimerActive) const SizedBox(height: 40),
-        ],
+          ],
+        ),
       ),
     );
   }
-
-  // ... (Update _buildSessionHeader to remove progress info since it's infinite)
 
   Widget _buildSessionHeader(ThemeData theme, Color targetColor) {
     return Container(
@@ -457,7 +462,10 @@ class _TrainingTimerScreenState extends ConsumerState<TrainingTimerScreen> {
                 fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
         Text(value,
             style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                fontFeatures: const [FontFeature.tabularFigures()],
+                color: color)),
       ],
     );
   }

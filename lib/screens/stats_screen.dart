@@ -11,6 +11,7 @@ import '../services/deepseek_service.dart';
 import '../providers/oll_pll_provider.dart';
 import '../services/oll_pll_data.dart';
 import '../services/oll_pll_classifier.dart';
+import '../utils/ios_platform_helper.dart';
 import '../widgets/oll_pll_heatmap.dart';
 import '../widgets/qr_export_dialog.dart';
 import 'qr_scanner_screen.dart';
@@ -24,6 +25,7 @@ class StatsScreen extends ConsumerStatefulWidget {
 
 class _StatsScreenState extends ConsumerState<StatsScreen> {
   String? _compareSessionId;
+  int _activeTabIndex = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +48,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
         : <Solve>[];
 
     final theme = Theme.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isCompactWidth = screenWidth < 390;
     final migrationService = ref.read(csvMigrationServiceProvider);
 
     final best = statsRepo.calculateBestTime(
@@ -63,337 +67,388 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       length: 2,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => _runAutoAnalysis(context, ref, solves, avg ?? 0),
-          icon: const Icon(Icons.analytics),
-          label: const Text('Analisi Automatica'),
-        ),
-        appBar: AppBar(
-          title: const Text('STATISTICHE',
-              style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                  fontSize: 16)),
-          backgroundColor: Colors.transparent,
-          bottom: TabBar(
+        floatingActionButton: (_activeTabIndex == 0 && solves.isNotEmpty)
+            ? FloatingActionButton.extended(
+                onPressed: () {
+                  IosPlatformHelper.mediumImpact();
+                  _runAutoAnalysis(context, ref, solves, avg ?? 0);
+                },
+                icon: const Icon(Icons.analytics),
+                label: const Text('Analisi Automatica'),
+              )
+            : null,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: TabBar(
+            onTap: (index) {
+              IosPlatformHelper.selectionClick();
+              if (_activeTabIndex != index) {
+                setState(() => _activeTabIndex = index);
+              }
+            },
+            indicatorColor: theme.colorScheme.primary,
+            labelColor: theme.colorScheme.primary,
+            unselectedLabelColor: Colors.grey,
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              letterSpacing: 0.6,
+            ),
             tabs: [
-              const Tab(text: 'Generali'),
-              Tab(text: 'Heatmap ${OllPllClassifier.getLabelForPuzzle(selectedCubeType)}'),
+              const Tab(height: 42, text: 'Generali'),
+              Tab(
+                height: 42,
+                text:
+                    'Heatmap ${OllPllClassifier.getLabelForPuzzle(selectedCubeType)}',
+              ),
             ],
           ),
         ),
-        body: TabBarView(
-          children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  if (solves.isNotEmpty) ...[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Confronta con:',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey)),
-                        DropdownButton<String>(
-                          value: _compareSessionId,
-                          hint: const Text('Nessuna'),
-                          items: [
-                            const DropdownMenuItem<String>(
-                                value: null, child: Text('Nessuna')),
-                            ...ref
-                                .read(solveRepositoryProvider)
-                                .getAvailableSessions(
-                                    cubeType: selectedCubeType)
-                                .where((s) => s != activeSession)
-                                .map((s) =>
-                                    DropdownMenuItem(value: s, child: Text(s))),
-                          ],
-                          onChanged: (val) =>
-                              setState(() => _compareSessionId = val),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  Container(
-                    height: 200,
-                    padding:
-                        const EdgeInsets.only(right: 16, top: 12, bottom: 8),
-                    decoration: BoxDecoration(
-                      color: theme.cardTheme.color,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color:
-                              theme.colorScheme.primary.withValues(alpha: 0.1)),
-                    ),
-                    child: LineChart(
-                      LineChartData(
-                        gridData: FlGridData(
-                          show: true,
-                          drawVerticalLine: false,
-                          getDrawingHorizontalLine: (value) => FlLine(
+        body: NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            return false;
+          },
+          child: TabBarView(
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    if (solves.isNotEmpty) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Confronta con:',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey)),
+                          DropdownButton<String>(
+                            value: _compareSessionId,
+                            hint: const Text('Nessuna'),
+                            dropdownColor: const Color(0xFF1E293B),
+                            borderRadius: BorderRadius.circular(12),
+                            items: [
+                              const DropdownMenuItem<String>(
+                                  value: null, child: Text('Nessuna')),
+                              ...ref
+                                  .read(solveRepositoryProvider)
+                                  .getAvailableSessions(
+                                      cubeType: selectedCubeType)
+                                  .where((s) => s != activeSession)
+                                  .map((s) => DropdownMenuItem(
+                                      value: s, child: Text(s))),
+                            ],
+                            onChanged: (val) {
+                              IosPlatformHelper.selectionClick();
+                              setState(() => _compareSessionId = val);
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    Container(
+                      height: 190,
+                      padding:
+                          const EdgeInsets.only(right: 16, top: 12, bottom: 8),
+                      decoration: BoxDecoration(
+                        color: theme.cardTheme.color,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
                             color: theme.colorScheme.primary
-                                .withValues(alpha: 0.1),
-                            strokeWidth: 1,
-                          ),
-                        ),
-                        titlesData: const FlTitlesData(show: false),
-                        borderData: FlBorderData(show: false),
-                        minX: solves.length <= 1 ? -0.5 : 0,
-                        maxX: solves.length <= 1
-                            ? 0.5
-                            : (solves.length - 1).toDouble(),
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: solves
-                                .asMap()
-                                .entries
-                                .map((e) => FlSpot(e.key.toDouble(),
-                                    e.value.effectiveTimeMs().toDouble()))
-                                .toList(),
-                            isCurved: true,
-                            color: theme.colorScheme.primary,
-                            barWidth: 4,
-                            isStrokeCapRound: true,
-                            dotData: FlDotData(
-                              show: true,
-                              getDotPainter: (spot, percent, barData, index) =>
-                                  FlDotCirclePainter(
-                                radius: 4,
-                                color: theme.colorScheme.primary,
-                                strokeWidth: 2,
-                                strokeColor: theme.cardTheme.color!,
-                              ),
+                                .withValues(alpha: 0.1)),
+                      ),
+                      child: LineChart(
+                        LineChartData(
+                          gridData: FlGridData(
+                            show: true,
+                            drawVerticalLine: false,
+                            getDrawingHorizontalLine: (value) => FlLine(
+                              color: theme.colorScheme.primary
+                                  .withValues(alpha: 0.1),
+                              strokeWidth: 1,
                             ),
-                            belowBarData: BarAreaData(
-                                show: true,
-                                color: theme.colorScheme.primary
-                                    .withValues(alpha: 0.1)),
                           ),
-                          if (compareSolves.isNotEmpty)
+                          titlesData: const FlTitlesData(show: false),
+                          borderData: FlBorderData(show: false),
+                          minX: solves.length <= 1 ? -0.5 : 0,
+                          maxX: solves.length <= 1
+                              ? 0.5
+                              : (solves.length - 1).toDouble(),
+                          lineBarsData: [
                             LineChartBarData(
-                              spots: compareSolves
+                              spots: solves
                                   .asMap()
                                   .entries
                                   .map((e) => FlSpot(e.key.toDouble(),
                                       e.value.effectiveTimeMs().toDouble()))
                                   .toList(),
                               isCurved: true,
-                              color: Colors.purpleAccent,
-                              barWidth: 3,
+                              color: theme.colorScheme.primary,
+                              barWidth: 4,
                               isStrokeCapRound: true,
-                              dotData: const FlDotData(show: false),
-                              belowBarData: BarAreaData(show: false),
+                              dotData: FlDotData(
+                                show: true,
+                                getDotPainter:
+                                    (spot, percent, barData, index) =>
+                                        FlDotCirclePainter(
+                                  radius: 4,
+                                  color: theme.colorScheme.primary,
+                                  strokeWidth: 2,
+                                  strokeColor: theme.cardTheme.color!,
+                                ),
+                              ),
+                              belowBarData: BarAreaData(
+                                  show: true,
+                                  color: theme.colorScheme.primary
+                                      .withValues(alpha: 0.1)),
                             ),
-                        ],
+                            if (compareSolves.isNotEmpty)
+                              LineChartBarData(
+                                spots: compareSolves
+                                    .asMap()
+                                    .entries
+                                    .map((e) => FlSpot(e.key.toDouble(),
+                                        e.value.effectiveTimeMs().toDouble()))
+                                    .toList(),
+                                isCurved: true,
+                                color: Colors.purpleAccent,
+                                barWidth: 3,
+                                isStrokeCapRound: true,
+                                dotData: const FlDotData(show: false),
+                                belowBarData: BarAreaData(show: false),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 2.2,
-                    children: [
-                      _buildStatCard(
-                          'MIGLIORE',
-                          best != null
-                              ? statsRepo.formatMs(best.round().toInt())
-                              : '--',
-                          Icons.emoji_events_rounded,
-                          theme.colorScheme.primary),
-                      _buildStatCard(
-                          'PEGGIORE',
-                          worst != null
-                              ? statsRepo.formatMs(worst.round().toInt())
-                              : '--',
-                          Icons.trending_down_rounded,
-                          Colors.redAccent),
-                      _buildStatCard(
-                          'Ao5',
-                          ao5 != null ? statsRepo.formatMs(ao5.round()) : '--',
-                          Icons.history_rounded,
-                          Colors.orangeAccent),
-                      _buildStatCard(
-                          'Ao12',
-                          ao12 != null
-                              ? statsRepo.formatMs(ao12.round())
-                              : '--',
-                          Icons.layers_rounded,
-                          Colors.purpleAccent),
-                      _buildStatCard(
-                          'MEDIA',
-                          avg != null ? statsRepo.formatMs(avg.round()) : '--',
-                          Icons.functions_rounded,
-                          theme.colorScheme.secondary),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('DATI E BACKUP',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
-                            color: Colors.grey)),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            final path = await migrationService.exportAll();
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('CSV salvato: $path')));
-                          },
-                          icon: const Icon(Icons.description, size: 18),
-                          label: const Text('Esporta CSV',
-                              style: TextStyle(fontSize: 12)),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            final success = await migrationService.importAll();
-                            if (!context.mounted) return;
-                            if (success) {
+                    const SizedBox(height: 20),
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: isCompactWidth ? 1.95 : 2.15,
+                      children: [
+                        _buildStatCard(
+                            'MIGLIORE',
+                            best != null
+                                ? statsRepo.formatMs(best.round().toInt())
+                                : '--',
+                            Icons.emoji_events_rounded,
+                            theme.colorScheme.primary),
+                        _buildStatCard(
+                            'PEGGIORE',
+                            worst != null
+                                ? statsRepo.formatMs(worst.round().toInt())
+                                : '--',
+                            Icons.trending_down_rounded,
+                            Colors.redAccent),
+                        _buildStatCard(
+                            'Ao5',
+                            ao5 != null ? statsRepo.formatMs(ao5.round()) : '--',
+                            Icons.history_rounded,
+                            Colors.orangeAccent),
+                        _buildStatCard(
+                            'Ao12',
+                            ao12 != null
+                                ? statsRepo.formatMs(ao12.round())
+                                : '--',
+                            Icons.layers_rounded,
+                            Colors.purpleAccent),
+                        _buildStatCard(
+                            'MEDIA',
+                            avg != null ? statsRepo.formatMs(avg.round()) : '--',
+                            Icons.functions_rounded,
+                            theme.colorScheme.secondary),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('DATI E BACKUP',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                              color: Colors.grey)),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              IosPlatformHelper.lightImpact();
+                              final path = await migrationService.exportAll();
+                              if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text(
-                                          'Dati importati con successo!')));
-                            }
-                          },
-                          icon: const Icon(Icons.download_rounded, size: 18),
-                          label: const Text('Importa CSV',
-                              style: TextStyle(fontSize: 12)),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (_) => QrExportDialog(
-                                solves: solves,
-                                cubeTypeLabel: selectedCubeType.label,
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.qr_code, size: 18),
-                          label: const Text('QR Export',
-                              style: TextStyle(fontSize: 12)),
-                          style: FilledButton.styleFrom(
-                              backgroundColor: theme.colorScheme.secondary),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => const QrScannerScreen()));
-                          },
-                          icon: const Icon(Icons.qr_code_scanner, size: 18),
-                          label: const Text('QR Import',
-                              style: TextStyle(fontSize: 12)),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('SOLVE RECENTI',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
-                            color: Colors.grey)),
-                  ),
-                  const SizedBox(height: 12),
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: solves.length,
-                    itemBuilder: (context, i) {
-                      final s = solves[i];
-                      final isDnf = s.penalty == 'DNF';
-                      final isPlus2 = s.penalty == '+2';
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          dense: true,
-                          onTap: () => _showPenaltyDialog(context, s),
-                          title: Row(
-                            children: [
-                              Text(
-                                statsRepo.formatMs(s.timeMs),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  decoration:
-                                      isDnf ? TextDecoration.lineThrough : null,
-                                  color: isDnf ? Colors.grey : null,
-                                ),
-                              ),
-                              if (isPlus2)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 4.0),
-                                  child: Text(
-                                    '(+2)',
-                                    style: TextStyle(
-                                        color: Colors.red[400],
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              if (isDnf)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 4.0),
-                                  child: Text(
-                                    'DNF',
-                                    style: TextStyle(
-                                        color: Colors.red[400],
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                            ],
+                                  SnackBar(content: Text('CSV salvato: $path')));
+                            },
+                            icon: const Icon(Icons.description, size: 18),
+                            label: const Text('Esporta CSV',
+                                style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(44),
+                            ),
                           ),
-                          subtitle: Text(s.scramble,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  fontSize: 11, color: Colors.grey)),
-                          trailing: Text(
-                              s.date.toLocal().toString().split(' ')[0],
-                              style: const TextStyle(fontSize: 10)),
                         ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 80),
-                ],
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              IosPlatformHelper.lightImpact();
+                              final success =
+                                  await migrationService.importAll();
+                              if (!context.mounted) return;
+                              if (success) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            'Dati importati con successo!')));
+                              }
+                            },
+                            icon: const Icon(Icons.download_rounded, size: 18),
+                            label: const Text('Importa CSV',
+                                style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(44),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: () {
+                              IosPlatformHelper.lightImpact();
+                              showDialog(
+                                context: context,
+                                builder: (_) => QrExportDialog(
+                                  solves: solves,
+                                  cubeTypeLabel: selectedCubeType.label,
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.qr_code, size: 18),
+                            label: const Text('QR Export',
+                                style: TextStyle(fontSize: 12)),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: theme.colorScheme.secondary,
+                              minimumSize: const Size.fromHeight(44),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: () {
+                              IosPlatformHelper.lightImpact();
+                              Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) => const QrScannerScreen()));
+                            },
+                            icon: const Icon(Icons.qr_code_scanner, size: 18),
+                            label: const Text('QR Import',
+                                style: TextStyle(fontSize: 12)),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(44),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 28),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('SOLVE RECENTI',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                              color: Colors.grey)),
+                    ),
+                    const SizedBox(height: 12),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: solves.length,
+                      itemBuilder: (context, i) {
+                        final s = solves[i];
+                        final isDnf = s.penalty == 'DNF';
+                        final isPlus2 = s.penalty == '+2';
+
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            dense: true,
+                            onTap: () {
+                              IosPlatformHelper.selectionClick();
+                              _showPenaltyDialog(context, s);
+                            },
+                            title: Row(
+                              children: [
+                                Text(
+                                  statsRepo.formatMs(s.timeMs),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures()
+                                    ],
+                                    decoration: isDnf
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                    color: isDnf ? Colors.grey : null,
+                                  ),
+                                ),
+                                if (isPlus2)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 4.0),
+                                    child: Text(
+                                      '(+2)',
+                                      style: TextStyle(
+                                          color: Colors.red[400],
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                if (isDnf)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 4.0),
+                                    child: Text(
+                                      'DNF',
+                                      style: TextStyle(
+                                          color: Colors.red[400],
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            subtitle: Text(s.scramble,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 11, color: Colors.grey)),
+                            trailing: Text(
+                                s.date.toLocal().toString().split(' ')[0],
+                                style: const TextStyle(fontSize: 10)),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 80),
+                  ],
+                ),
               ),
-            ),
-            const OllPllHeatmap(), // Tab 2
-          ],
+              const OllPllHeatmap(), // Tab 2
+            ],
+          ),
         ),
       ),
     );
@@ -433,8 +488,9 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
             .where((s) => s.splits!.containsKey(l))
             .map((s) => s.splits![l]!)
             .toList();
-        if (valid.isNotEmpty)
+        if (valid.isNotEmpty) {
           avgs[l] = (valid.reduce((a, b) => a + b) / valid.length) / 1000.0;
+        }
       }
       splitsStr = avgs.entries
           .map((e) => '${e.key}: ${e.value.toStringAsFixed(2)}s')
@@ -490,7 +546,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       'sessionTrend': trendStr.isNotEmpty ? trendStr : null,
     };
 
-    final prompt =
+    const prompt =
         "Analizza questa sessione nel dettaglio. Evidenzia i miei punti deboli e dimmi esattamente cosa devo allenare. Sii pratico e vai dritto al punto.";
     final response = await ref
         .read(deepSeekServiceProvider)
@@ -563,7 +619,6 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   }
 
   void _updatePenalty(Solve solve, String newPenalty) {
-    // Generate a new Solve instance with the updated penalty.
     final updatedSolve = Solve(
       id: solve.id,
       cube: solve.cube,
@@ -572,6 +627,8 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
       penalty: newPenalty,
       date: solve.date,
       cubeType: solve.cubeType,
+      sessionId: solve.sessionId,
+      splits: solve.splits,
     );
     ref.read(solveRepositoryProvider).updateSolve(updatedSolve);
   }
@@ -579,7 +636,7 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
   Widget _buildStatCard(
       String label, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(16),
@@ -592,18 +649,29 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
           Row(
             children: [
               Icon(icon, size: 16, color: color),
-              const SizedBox(width: 8),
-              Text(label,
-                  style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.8,
-                      color: Colors.grey)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                        color: Colors.grey)),
+              ),
             ],
           ),
-          Text(value,
-              style:
-                  const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                )),
+          ),
         ],
       ),
     );
